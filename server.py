@@ -1,5 +1,5 @@
 """
-desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Final Estável)
+desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Definitiva)
 Global Solution 2026.2 | Turma: 1TAGOR | Grupo 16
 Integrantes: Tatiane Gonçalves de Oliveira (RM575788) & Willian Robson Silva (RM576559)
 """
@@ -25,6 +25,7 @@ from google.genai import types
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1beta"}) if GEMINI_API_KEY else None
+
 
 def _descobrir_modelo_ativo() -> str:
     if not client:
@@ -54,13 +55,16 @@ def _descobrir_modelo_ativo() -> str:
         pass
     return "gemini-2.5-flash-lite"
 
+
 MODEL_ID = _descobrir_modelo_ativo()
 DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
+# Ícone branco com 'd' escuro e ponto terracota no canto superior direito (Imagem 1)
 EMBEDDED_ICON_SVG = r'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#133136"/>
-  <text x="256" y="290" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="96" letter-spacing="-2" fill="#F5F4EF">d<tspan fill="#D94E34">.</tspan>AI</text>
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <text x="235" y="345" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="280" fill="#133136">d</text>
+  <circle cx="362" cy="155" r="34" fill="#D94E34"/>
 </svg>'''
 
 EMBEDDED_MANIFEST_JSON = r'''{
@@ -82,7 +86,7 @@ EMBEDDED_MANIFEST_JSON = r'''{
   ]
 }'''
 
-EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v5';
+EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v6';
 const ASSETS = ['/', '/manifest.json', '/static/icon.svg'];
 
 self.addEventListener('install', event => {
@@ -256,13 +260,13 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       --terracotta: #D94E34;
       --amber: #C97A16;
       --white: #FFFFFF;
-      --text-muted: #5A6B6E;
-      --border-soft: #E2E0D8;
+      --text-muted: #556669;
+      --border-soft: #E5E3DB;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       background-color: #E6E4DD;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       color: var(--petrol);
       display: flex;
       justify-content: center;
@@ -270,7 +274,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
     }
     .phone-shell {
       width: 100%;
-      max-width: 440px;
+      max-width: 430px;
       min-height: 100vh;
       background-color: var(--bg-cream);
       display: flex;
@@ -281,23 +285,38 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       overflow-x: hidden;
     }
     .top-bar {
-      padding: 24px 24px 8px 24px;
+      padding: 28px 26px 10px 26px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
     .logo {
-      font-family: 'Merriweather', serif;
+      font-family: 'Merriweather', Georgia, serif;
       font-weight: 900;
-      font-size: 26px;
+      font-size: 27px;
       color: var(--petrol);
-      letter-spacing: -0.5px;
+      letter-spacing: -0.6px;
     }
     .logo .dot { color: var(--terracotta); }
+    .logo .i-stem {
+      position: relative;
+      display: inline-block;
+    }
+    .logo .i-dot {
+      position: absolute;
+      top: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--terracotta);
+    }
     .btn-back {
       background: var(--white);
       border: 1.5px solid var(--border-soft);
-      color: var(--petrol);
+      color: #133136;
+      font-family: 'Inter', sans-serif;
       font-size: 16px;
       font-weight: 600;
       padding: 10px 16px;
@@ -306,40 +325,43 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       display: none;
     }
     .content {
-      padding: 12px 24px 24px 24px;
+      padding: 10px 26px 24px 26px;
       flex: 1;
       display: flex;
       flex-direction: column;
     }
     .hero-title {
-      font-family: 'Merriweather', serif;
+      font-family: 'Merriweather', Georgia, serif;
       font-weight: 900;
-      font-size: 36px;
-      line-height: 1.15;
+      font-size: 38px;
+      line-height: 1.14;
+      letter-spacing: -0.6px;
       color: var(--petrol);
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
     .hero-subtitle {
-      font-size: 19px;
+      font-family: 'Inter', sans-serif;
+      font-size: 20px;
+      font-weight: 400;
       line-height: 1.45;
       color: var(--text-muted);
-      margin-bottom: 28px;
+      margin-bottom: 30px;
     }
     .action-list { display: flex; flex-direction: column; gap: 16px; }
     .action-card {
       display: flex;
       align-items: center;
       gap: 18px;
-      padding: 22px 20px;
-      border-radius: 22px;
+      padding: 22px 22px;
+      border-radius: 24px;
       border: 1.5px solid var(--border-soft);
       background: var(--white);
       color: #133136;
+      font-family: 'Inter', sans-serif;
       text-align: left;
       cursor: pointer;
       transition: transform 0.12s ease;
-      box-shadow: 0 4px 14px rgba(19, 49, 54, 0.05);
-    }
+      box-shadow: 0 4px 16px rgba(19, 49, 54, 0.04);
     }
     .action-card:active { transform: scale(0.98); }
     .action-card.primary {
@@ -348,29 +370,43 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       color: var(--white);
     }
     .icon-badge {
-      width: 54px;
-      height: 54px;
-      min-width: 54px;
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       background: var(--bg-cream);
-      color: var(--petrol);
+      color: #133136;
     }
     .action-card.primary .icon-badge {
       background: var(--terracotta);
       color: var(--white);
     }
-    .card-texts h3 { font-size: 21px; font-weight: 700; margin-bottom: 4px; }
-    .card-texts p { font-size: 16px; opacity: 0.82; }
+    .card-texts h3 {
+      font-family: 'Inter', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: inherit;
+      margin-bottom: 4px;
+    }
+    .card-texts p {
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: inherit;
+      opacity: 0.78;
+    }
     .btn-ja-paguei {
       margin-top: 22px;
       background: transparent;
-      border: 1.5px dashed #B8B5AA;
-      color: var(--petrol);
-      padding: 15px;
-      border-radius: 16px;
+      border: 1.5px dashed #C2BFB5;
+      color: #133136;
+      font-family: 'Inter', sans-serif;
+      padding: 16px;
+      border-radius: 18px;
       font-size: 17px;
       font-weight: 600;
       cursor: pointer;
@@ -399,6 +435,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       padding: 20px;
       font-size: 21px;
       font-weight: 700;
+      font-family: 'Inter', sans-serif;
       cursor: pointer;
       margin-top: 8px;
     }
@@ -411,6 +448,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       padding: 20px;
       font-size: 20px;
       font-weight: 700;
+      font-family: 'Inter', sans-serif;
       cursor: pointer;
       margin-bottom: 16px;
       display: flex;
@@ -422,12 +460,13 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
     .btn-demo {
       background: #EAE8DF;
-      color: var(--petrol);
+      color: #133136;
       border: none;
-      border-radius: 12px;
-      padding: 12px 14px;
+      border-radius: 14px;
+      padding: 13px 15px;
       font-size: 15px;
       font-weight: 600;
+      font-family: 'Inter', sans-serif;
       cursor: pointer;
       margin-bottom: 16px;
       text-align: left;
@@ -442,13 +481,13 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       margin-bottom: 16px;
     }
     .upload-area img { max-width: 100%; max-height: 220px; border-radius: 12px; margin-top: 12px; }
-    .verdict-card { margin: -12px -24px 0 -24px; flex: 1; display: flex; flex-direction: column; }
-    .verdict-header { background: var(--terracotta); color: var(--white); padding: 28px 24px 26px 24px; }
+    .verdict-card { margin: -10px -26px 0 -26px; flex: 1; display: flex; flex-direction: column; }
+    .verdict-header { background: var(--terracotta); color: var(--white); padding: 28px 26px 26px 26px; }
     .verdict-header.amber { background: var(--amber); }
     .verdict-header.safe { background: var(--petrol); }
     .verdict-badge { font-size: 14px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.92; margin-bottom: 10px; }
-    .verdict-title { font-family: 'Merriweather', serif; font-size: 32px; line-height: 1.18; font-weight: 900; }
-    .verdict-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 16px; }
+    .verdict-title { font-family: 'Merriweather', Georgia, serif; font-size: 32px; line-height: 1.18; font-weight: 900; }
+    .verdict-body { padding: 22px 26px; display: flex; flex-direction: column; gap: 16px; }
     .white-panel {
       background: var(--white);
       border-radius: 20px;
@@ -468,17 +507,18 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
     .btn-listen {
       width: 100%; background: var(--petrol); color: var(--white); border: none;
       border-radius: 18px; padding: 20px; font-size: 20px; font-weight: 700;
+      font-family: 'Inter', sans-serif;
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px;
     }
     .source-note { text-align: center; font-size: 15px; color: var(--text-muted); margin-top: 4px; }
     .loader { display: none; text-align: center; padding: 40px 20px; font-size: 20px; font-weight: 600; }
-    .footer { padding: 18px 24px 26px 24px; text-align: center; font-size: 15px; line-height: 1.4; color: var(--text-muted); }
+    .footer { padding: 18px 26px 28px 26px; text-align: center; font-size: 15px; line-height: 1.45; color: var(--text-muted); }
   </style>
 </head>
 <body>
   <div class="phone-shell">
     <div class="top-bar">
-      <div class="logo" id="brandLogo">desconfie<span class="dot">.</span>AI</div>
+      <div class="logo" id="brandLogo">desconf<span class="i-stem">ı<span class="i-dot"></span></span>e<span class="dot">.</span>AI</div>
       <button class="btn-back" id="btnBack" onclick="goHome()">← Voltar</button>
     </div>
 
@@ -538,7 +578,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       </div>
 
       <div class="screen" id="screenFalar">
-        <h2 class="hero-title" style="font-size:30px;">Conte o que aconteceu</h2>
+        <h2 class="hero-title" style="font-size:32px;">Conte o que aconteceu</h2>
         <p class="hero-subtitle">Toque no botão vermelho para falar ou escreva abaixo.</p>
 
         <button class="btn-mic" id="btnMic" onclick="toggleGravacao()">
@@ -555,12 +595,12 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       </div>
 
       <div class="screen" id="screenPrint">
-        <h2 class="hero-title" style="font-size:30px;">Mandar o print</h2>
+        <h2 class="hero-title" style="font-size:32px;">Mandar o print</h2>
         <p class="hero-subtitle">Escolha a foto da conversa, SMS ou tela do Pix.</p>
 
         <label class="upload-area" for="inputPrint">
           <div style="font-size:20px;font-weight:700;">📷 Toque aqui para escolher a foto</div>
-          <div style="font-size:15px;color:#5A6B6E;margin-top:6px;">A imagem é apagada logo após a análise</div>
+          <div style="font-size:15px;color:#556669;margin-top:6px;">A imagem é apagada logo após a análise</div>
           <img id="previewPrint" style="display:none;" />
         </label>
         <input type="file" id="inputPrint" accept="image/*" style="display:none;" onchange="mostrarPreview(this, 'previewPrint')" />
@@ -571,7 +611,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       </div>
 
       <div class="screen" id="screenBoleto">
-        <h2 class="hero-title" style="font-size:30px;">Conferir boleto</h2>
+        <h2 class="hero-title" style="font-size:32px;">Conferir boleto</h2>
         <p class="hero-subtitle">Eu verifico o banco verdadeiro antes de você pagar.</p>
 
         <input type="text" class="input-box" id="bancoBoleto" placeholder="Qual banco ou empresa diz ser? (Ex: Caixa)" />
@@ -593,7 +633,7 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       <div class="loader" id="loaderBox">
         <div style="font-size:36px;margin-bottom:12px;">🔍</div>
         Investigando com calma...<br>
-        <span style="font-size:16px;font-weight:400;color:#5A6B6E;">Conferindo banco, links e base de golpes</span>
+        <span style="font-size:16px;font-weight:400;color:#556669;">Conferindo banco, links e base de golpes</span>
       </div>
 
       <div class="screen" id="screenVerdict">
@@ -1070,7 +1110,11 @@ def etapa1_extrair_evidencias(texto: str, imagem_path: str = None, audio_path: s
     resp = client.models.generate_content(
         model=MODEL_ID,
         contents=conteudos,
-        config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0.0),
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.0,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
     )
     try:
         return json.loads(resp.text)
@@ -1232,7 +1276,8 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
             "Fonte: FEBRABAN"
         )
     return texto_saida
-    
+
+
 @app.get("/manifest.json")
 async def pwa_manifest():
     return Response(content=EMBEDDED_MANIFEST_JSON, media_type="application/manifest+json")
