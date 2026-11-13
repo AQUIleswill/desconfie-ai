@@ -1208,29 +1208,29 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
     conteudos.extend(_montar_partes_midia(imagem_path, audio_path))
 
     resp = client.models.generate_content(
-     model=MODEL_ID,
-     contents=conteudos,
-     config=types.GenerateContentConfig(
-         system_instruction=SYSTEM_PROMPT,
-         temperature=0.2,
-         max_output_tokens=1024,
-         thinking_config=types.ThinkingConfig(thinking_budget=0),
-     ),
- )
- texto_saida = (resp.text or "").strip()
- if not texto_saida:
-     texto_saida = (
-         "Sou o Desconfie, um assistente de inteligência artificial.\n"
-         "ATENÇÃO\n"
-         "Não consegui ler todos os detalhes desta imagem.\n"
-         "Pode mandar uma foto mais nítida ou contar o que diz a mensagem?\n"
-         "O que fazer agora:\n"
-         "1. Não faça pagamentos nem clique em links agora.\n"
-         "2. Confirme pelo número oficial ou atrás do seu cartão.\n"
-         "Fonte: FEBRABAN"
-     )
- return texto_saida
-
+        model=MODEL_ID,
+        contents=conteudos,
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.2,
+            max_output_tokens=1024,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        ),
+    )
+    texto_saida = (resp.text or "").strip()
+    if not texto_saida:
+        texto_saida = (
+            "Sou o Desconfie, um assistente de inteligência artificial.\n"
+            "ATENÇÃO\n"
+            "Não consegui ler todos os detalhes desta imagem.\n"
+            "Pode mandar uma foto mais nítida ou contar o que diz a mensagem?\n"
+            "O que fazer agora:\n"
+            "1. Não faça pagamentos nem clique em links agora.\n"
+            "2. Confirme pelo número oficial ou atrás do seu cartão.\n"
+            "Fonte: FEBRABAN"
+        )
+    return texto_saida
+    
 @app.get("/manifest.json")
 async def pwa_manifest():
     return Response(content=EMBEDDED_MANIFEST_JSON, media_type="application/manifest+json")
