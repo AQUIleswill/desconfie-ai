@@ -24,8 +24,37 @@ from google import genai
 from google.genai import types
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-MODEL_ID = "gemini-3-flash-preview"
+client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1beta"}) if GEMINI_API_KEY else None
+
+def _descobrir_modelo_ativo() -> str:
+    if not client:
+        return "gemini-2.5-flash"
+    try:
+        disponiveis = [
+            m.name.replace("models/", "")
+            for m in client.models.list()
+            if "generateContent" in (getattr(m, "supported_actions", None) or [])
+            and "gemini" in m.name.lower()
+            and "embedding" not in m.name.lower()
+            and "imagen" not in m.name.lower()
+        ]
+        preferidos = [
+            "gemini-3-flash-preview",
+            "gemini-3.1-flash-lite-preview",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+        ]
+        for p in preferidos:
+            if p in disponiveis:
+                return p
+        if disponiveis:
+            return disponiveis[0]
+    except Exception:
+        pass
+    return "gemini-2.5-flash-lite"
+
+MODEL_ID = _descobrir_modelo_ativo()
 DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
