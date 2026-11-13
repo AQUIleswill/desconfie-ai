@@ -1,5 +1,5 @@
 """
-desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Definitiva)
+desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Final)
 Global Solution 2026.2 | Turma: 1TAGOR | Grupo 16
 Integrantes: Tatiane Gonçalves de Oliveira (RM575788) & Willian Robson Silva (RM576559)
 """
@@ -7,6 +7,8 @@ Integrantes: Tatiane Gonçalves de Oliveira (RM575788) & Willian Robson Silva (R
 import os
 import re
 import json
+import zlib
+import struct
 import base64
 import sqlite3
 import tempfile
@@ -60,12 +62,63 @@ MODEL_ID = _descobrir_modelo_ativo()
 DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
-# Ícone branco com 'd' escuro e ponto terracota no canto superior direito (Imagem 1)
 EMBEDDED_ICON_SVG = r'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" fill="#FFFFFF"/>
-  <text x="235" y="345" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="280" fill="#133136">d</text>
-  <circle cx="362" cy="155" r="34" fill="#D94E34"/>
+  <text x="232" y="348" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="285" fill="#133136">d</text>
+  <circle cx="364" cy="152" r="34" fill="#D94E34"/>
 </svg>'''
+
+
+def _gerar_icone_png_bytes(size: int = 180) -> bytes:
+    """Gera um PNG real (180x180) sem dependências externas para o apple-touch-icon do iOS."""
+    bg = (255, 255, 255)      # Branco puro (#FFFFFF)
+    petrol = (19, 49, 54)     # Verde-petróleo (#133136)
+    terra = (217, 78, 52)     # Terracota (#D94E34)
+
+    # Desenha em escala relativa 0..100 para nitidez
+    raw = bytearray()
+    cx_bowl, cy_bowl = 44.0, 62.0
+    r_outer, r_inner = 18.5, 10.5
+    stem_x1, stem_x2 = 52.0, 61.5
+    stem_y1, stem_y2 = 27.0, 80.5
+    serif_top_x1, serif_top_x2 = 47.0, 61.5
+    serif_top_y1, serif_top_y2 = 27.0, 32.0
+    serif_bot_x1, serif_bot_x2 = 52.0, 65.5
+    serif_bot_y1, serif_bot_y2 = 75.5, 80.5
+    dot_cx, dot_cy, dot_r = 73.0, 30.0, 7.2
+
+    for py in range(size):
+        raw.append(0)  # filter type 0 (None)
+        y = (py + 0.5) * 100.0 / size
+        for px in range(size):
+            x = (px + 0.5) * 100.0 / size
+
+            # Ponto terracota no canto superior direito
+            if (x - dot_cx) ** 2 + (y - dot_cy) ** 2 <= dot_r ** 2:
+                raw.extend(terra)
+                continue
+
+            # Letra 'd' serifada em verde-petróleo
+            d_bowl = (x - cx_bowl) ** 2 + (y - cy_bowl) ** 2
+            in_bowl = (r_inner ** 2 <= d_bowl <= r_outer ** 2) and (x <= stem_x2)
+            in_stem = (stem_x1 <= x <= stem_x2) and (stem_y1 <= y <= stem_y2)
+            in_serif_top = (serif_top_x1 <= x <= serif_top_x2) and (serif_top_y1 <= y <= serif_top_y2)
+            in_serif_bot = (serif_bot_x1 <= x <= serif_bot_x2) and (serif_bot_y1 <= y <= serif_bot_y2)
+
+            if in_bowl or in_stem or in_serif_top or in_serif_bot:
+                raw.extend(petrol)
+            else:
+                raw.extend(bg)
+
+    def _chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack("!I", len(data)) + tag + data + struct.pack("!I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+    ihdr = struct.pack("!IIBBBBB", size, size, 8, 2, 0, 0, 0)
+    idat = zlib.compress(bytes(raw), level=9)
+    return b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", idat) + _chunk(b"IEND", b"")
+
+
+EMBEDDED_ICON_PNG = _gerar_icone_png_bytes(180)
 
 EMBEDDED_MANIFEST_JSON = r'''{
   "name": "desconfie.AI — Na dúvida, investigue.",
@@ -74,20 +127,25 @@ EMBEDDED_MANIFEST_JSON = r'''{
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F4EF",
+  "background_color": "#FFFFFF",
   "theme_color": "#133136",
   "icons": [
     {
-      "src": "/static/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/static/icon-v2.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-v2.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
   ]
 }'''
 
-EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v6';
-const ASSETS = ['/', '/manifest.json', '/static/icon.svg'];
+EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v8';
+const ASSETS = ['/', '/manifest.json', '/static/icon-v2.png', '/static/icon-v2.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
@@ -246,10 +304,10 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#133136" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="desconfie.AI" />
-  <link rel="apple-touch-icon" href="/static/icon.svg" />
-  <link rel="icon" type="image/svg+xml" href="/static/icon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/icon-v2.png" />
+  <link rel="icon" type="image/png" href="/static/icon-v2.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
@@ -399,19 +457,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       color: inherit;
       opacity: 0.78;
     }
-    .btn-ja-paguei {
-      margin-top: 22px;
-      background: transparent;
-      border: 1.5px dashed #C2BFB5;
-      color: #133136;
-      font-family: 'Inter', sans-serif;
-      padding: 16px;
-      border-radius: 18px;
-      font-size: 17px;
-      font-weight: 600;
-      cursor: pointer;
-      text-align: center;
-    }
     .screen { display: none; flex-direction: column; flex: 1; }
     .screen.active { display: flex; }
     .input-box {
@@ -458,19 +503,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
     }
     .btn-mic.recording { animation: pulse 1.2s infinite; background: #A9321C; }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-    .btn-demo {
-      background: #EAE8DF;
-      color: #133136;
-      border: none;
-      border-radius: 14px;
-      padding: 13px 15px;
-      font-size: 15px;
-      font-weight: 600;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
-      margin-bottom: 16px;
-      text-align: left;
-    }
     .upload-area {
       background: var(--white);
       border: 2px dashed var(--petrol);
@@ -571,10 +603,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
             </div>
           </button>
         </div>
-
-        <button class="btn-ja-paguei" onclick="enviarInvestigacao('Já fiz o Pix para um golpista, e agora?', 'geral')">
-          Já paguei ou passei dados. E agora?
-        </button>
       </div>
 
       <div class="screen" id="screenFalar">
@@ -586,10 +614,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
         </button>
 
         <textarea class="input-box" id="textoFalar" rows="4" placeholder="Ex: Recebi mensagem de um número novo dizendo que é meu filho pedindo Pix..."></textarea>
-
-        <button class="btn-demo" onclick="preencherExemploFilho()">
-          Testar exemplo do Falso Filho (Slide 3)
-        </button>
 
         <button class="btn-submit" onclick="enviarFala()">Conferir agora</button>
       </div>
@@ -622,10 +646,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
           <img id="previewBoleto" style="display:none;" />
         </label>
         <input type="file" id="inputBoleto" accept="image/*" style="display:none;" onchange="mostrarPreview(this, 'previewBoleto')" />
-
-        <button class="btn-demo" onclick="preencherExemploBoleto()">
-          Testar boleto falso da Caixa (Slide 9)
-        </button>
 
         <button class="btn-submit" onclick="enviarBoleto()">Conferir boleto</button>
       </div>
@@ -700,16 +720,6 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
         };
         reader.readAsDataURL(input.files[0]);
       }
-    }
-
-    function preencherExemploFilho() {
-      document.getElementById('textoFalar').value =
-        "Oi mãe, troquei de número (+55 71 90000-0000). Me faz um Pix de 1.500 urgente na chave pix@example.com? Depois te explico.";
-    }
-
-    function preencherExemploBoleto() {
-      document.getElementById('bancoBoleto').value = "Caixa";
-      document.getElementById('codigoBoleto').value = "34191090080000000000000000000000000000035790";
     }
 
     async function toggleGravacao() {
@@ -1288,9 +1298,16 @@ async def pwa_sw():
     return Response(content=EMBEDDED_SW_JS, media_type="application/javascript")
 
 
+@app.get("/static/icon-v2.png")
+@app.get("/static/icon.png")
+async def pwa_icon_png():
+    return Response(content=EMBEDDED_ICON_PNG, media_type="image/png", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/static/icon-v2.svg")
 @app.get("/static/icon.svg")
 async def pwa_icon_svg():
-    return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml")
+    return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/", response_class=HTMLResponse)
