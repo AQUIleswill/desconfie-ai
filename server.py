@@ -334,10 +334,12 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       border-radius: 22px;
       border: 1.5px solid var(--border-soft);
       background: var(--white);
+      color: #133136;
       text-align: left;
       cursor: pointer;
       transition: transform 0.12s ease;
       box-shadow: 0 4px 14px rgba(19, 49, 54, 0.05);
+    }
     }
     .action-card:active { transform: scale(0.98); }
     .action-card.primary {
