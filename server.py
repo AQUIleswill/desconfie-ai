@@ -59,8 +59,8 @@ DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
 EMBEDDED_ICON_SVG = r'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#133136"/>
-  <text x="50%" y="56%" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="145" fill="#F5F4EF">d<tspan fill="#D94E34">.</tspan>AI</text>
+  <rect width="512" height="512" fill="#133136"/>
+  <text x="256" y="290" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-weight="bold" font-size="96" letter-spacing="-2" fill="#F5F4EF">d<tspan fill="#D94E34">.</tspan>AI</text>
 </svg>'''
 
 EMBEDDED_MANIFEST_JSON = r'''{
