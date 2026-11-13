@@ -25,7 +25,7 @@ from google.genai import types
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-MODEL_ID = "gemini-2.5-flash"
+MODEL_ID = "gemini-3-flash-preview"
 DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
