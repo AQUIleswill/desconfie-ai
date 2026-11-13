@@ -1,5 +1,5 @@
 """
-desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Final)
+desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Final Estável)
 Global Solution 2026.2 | Turma: 1TAGOR | Grupo 16
 Integrantes: Tatiane Gonçalves de Oliveira (RM575788) & Willian Robson Silva (RM576559)
 """
@@ -29,13 +29,12 @@ MODEL_ID = "gemini-2.5-flash"
 DB_PATH = "desconfie_ai.db"
 BASE_DIR = Path(__file__).resolve().parent
 
-# Ícone PNG 512x512 embutido (fundo #133136, ponto #D94E34) para aparecer ao salvar no celular
-EMBEDDED_ICON_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+EMBEDDED_ICON_SVG = r'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="112" fill="#133136"/>
   <text x="50%" y="56%" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="145" fill="#F5F4EF">d<tspan fill="#D94E34">.</tspan>AI</text>
 </svg>'''
 
-EMBEDDED_MANIFEST_JSON = '''{
+EMBEDDED_MANIFEST_JSON = r'''{
   "name": "desconfie.AI — Na dúvida, investigue.",
   "short_name": "desconfie.AI",
   "description": "Agente de inteligência artificial que ajuda pessoas idosas a reconhecer golpes antes de pagar.",
@@ -46,21 +45,16 @@ EMBEDDED_MANIFEST_JSON = '''{
   "theme_color": "#133136",
   "icons": [
     {
-      "src": "/static/icon.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
       "src": "/static/icon.svg",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }'''
 
-EMBEDDED_SW_JS = '''const CACHE_NAME = 'desconfie-ai-v4';
-const ASSETS = ['/', '/manifest.json', '/static/icon.png', '/static/icon.svg'];
+EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v5';
+const ASSETS = ['/', '/manifest.json', '/static/icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
@@ -68,7 +62,11 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', event => {
@@ -77,7 +75,7 @@ self.addEventListener('fetch', event => {
 });
 '''
 
-SYSTEM_PROMPT = '''IDENTIDADE
+SYSTEM_PROMPT = r'''IDENTIDADE
 
 Você é o Desconfie, o agente do Desconfie.AI ("Na dúvida, investigue."). Sua missão é ajudar pessoas idosas e com pouca familiaridade com tecnologia a reconhecer golpes ANTES de pagar, clicar ou responder. Você analisa, explica e orienta. Quem decide é sempre a pessoa: você nunca paga, clica ou responde por ela.
 
@@ -206,7 +204,7 @@ O que fazer agora:
 3. Registre o boletim de ocorrência na delegacia ou pela delegacia eletrônica.
 '''
 
-EMBEDDED_INDEX_HTML = '''<!DOCTYPE html>
+EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -217,8 +215,8 @@ EMBEDDED_INDEX_HTML = '''<!DOCTYPE html>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="desconfie.AI" />
-  <link rel="apple-touch-icon" href="/static/icon.png" />
-  <link rel="icon" type="image/png" href="/static/icon.png" />
+  <link rel="apple-touch-icon" href="/static/icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/static/icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700;900&display=swap" rel="stylesheet">
@@ -726,7 +724,7 @@ EMBEDDED_INDEX_HTML = '''<!DOCTYPE html>
     function renderizarVeredito(data) {
       const texto = data.resposta_texto || "";
       ultimoTextoResposta = texto;
-      const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+      const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
       const niveis = ["GOLPE CONFIRMADO", "ALTO RISCO", "ATENÇÃO", "NÃO ENCONTREI SINAIS DE GOLPE"];
       let nivel = "";
@@ -1192,12 +1190,6 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
     return resp.text.strip()
 
 
-# Ícone PNG 1x1 fallback + SVG real para browsers modernos
-ICON_PNG_FALLBACK = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
-
-
 @app.get("/manifest.json")
 async def pwa_manifest():
     return Response(content=EMBEDDED_MANIFEST_JSON, media_type="application/manifest+json")
@@ -1210,11 +1202,6 @@ async def pwa_sw():
 
 @app.get("/static/icon.svg")
 async def pwa_icon_svg():
-    return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml")
-
-
-@app.get("/static/icon.png")
-async def pwa_icon_png():
     return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml")
 
 
