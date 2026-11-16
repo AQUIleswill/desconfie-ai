@@ -1,5 +1,5 @@
 """
-desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (Versão Final)
+desconfie.AI - Servidor Back-end FastAPI + Front-end Mobile HTML (PostgreSQL + IA)
 Global Solution 2026.2 | Turma: 1TAGOR | Grupo 16
 Integrantes: Tatiane Gonçalves de Oliveira (RM575788) & Willian Robson Silva (RM576559)
 """
@@ -15,6 +15,11 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
+
+try:
+    import psycopg
+except ImportError:
+    psycopg = None
 
 import requests
 import uvicorn
@@ -60,6 +65,10 @@ def _descobrir_modelo_ativo() -> str:
 
 MODEL_ID = _descobrir_modelo_ativo()
 DB_PATH = "desconfie_ai.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 BASE_DIR = Path(__file__).resolve().parent
 
 EMBEDDED_ICON_SVG = r'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
@@ -75,7 +84,6 @@ def _gerar_icone_png_bytes(size: int = 180) -> bytes:
     petrol = (19, 49, 54)     # Verde-petróleo (#133136)
     terra = (217, 78, 52)     # Terracota (#D94E34)
 
-    # Desenha em escala relativa 0..100 para nitidez
     raw = bytearray()
     cx_bowl, cy_bowl = 44.0, 62.0
     r_outer, r_inner = 18.5, 10.5
@@ -88,17 +96,15 @@ def _gerar_icone_png_bytes(size: int = 180) -> bytes:
     dot_cx, dot_cy, dot_r = 73.0, 30.0, 7.2
 
     for py in range(size):
-        raw.append(0)  # filter type 0 (None)
+        raw.append(0)
         y = (py + 0.5) * 100.0 / size
         for px in range(size):
             x = (px + 0.5) * 100.0 / size
 
-            # Ponto terracota no canto superior direito
             if (x - dot_cx) ** 2 + (y - dot_cy) ** 2 <= dot_r ** 2:
                 raw.extend(terra)
                 continue
 
-            # Letra 'd' serifada em verde-petróleo
             d_bowl = (x - cx_bowl) ** 2 + (y - cy_bowl) ** 2
             in_bowl = (r_inner ** 2 <= d_bowl <= r_outer ** 2) and (x <= stem_x2)
             in_stem = (stem_x1 <= x <= stem_x2) and (stem_y1 <= y <= stem_y2)
@@ -144,7 +150,7 @@ EMBEDDED_MANIFEST_JSON = r'''{
   ]
 }'''
 
-EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v8';
+EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v9';
 const ASSETS = ['/', '/manifest.json', '/static/icon-v2.png', '/static/icon-v2.svg'];
 
 self.addEventListener('install', event => {
@@ -932,32 +938,64 @@ RAG_FONTES_OFICIAIS = {
 }
 
 
+def _get_db_conn():
+    if DATABASE_URL and psycopg is not None:
+        return psycopg.connect(DATABASE_URL), "postgres"
+    return sqlite3.connect(DB_PATH), "sqlite"
+
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn, dialect = _get_db_conn()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS golpes_confirmados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tipo TEXT NOT NULL,
-            indicador TEXT UNIQUE NOT NULL,
-            roteiro TEXT NOT NULL,
-            ocorrencias INTEGER DEFAULT 1,
-            fonte_curadoria TEXT NOT NULL,
-            criado_em TEXT NOT NULL
+    if dialect == "postgres":
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS golpes_confirmados (
+                id SERIAL PRIMARY KEY,
+                tipo TEXT NOT NULL,
+                indicador TEXT UNIQUE NOT NULL,
+                roteiro TEXT NOT NULL,
+                ocorrencias INTEGER DEFAULT 1,
+                fonte_curadoria TEXT NOT NULL,
+                criado_em TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
+    else:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS golpes_confirmados (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo TEXT NOT NULL,
+                indicador TEXT UNIQUE NOT NULL,
+                roteiro TEXT NOT NULL,
+                ocorrencias INTEGER DEFAULT 1,
+                fonte_curadoria TEXT NOT NULL,
+                criado_em TEXT NOT NULL
+            )
+            """
+        )
+
     seed_data = [
         ("falso parente", "+5571900000000", "Oi mãe, troquei de número! Preciso pagar um boleto urgente, faz um Pix.", 37, "Polícia Civil de SP", datetime.now().isoformat()),
         ("falso parente", "pix@example.com", "Chave Pix usada em golpe do falso filho.", 19, "Polícia Civil de SP", datetime.now().isoformat()),
         ("boleto falso", "34191090080000000000000000000000000000035790", "Boleto enviado como Caixa mas com código do banco 341 (Itaú).", 12, "FEBRABAN", datetime.now().isoformat()),
     ]
     for item in seed_data:
-        cursor.execute(
-            "INSERT OR IGNORE INTO golpes_confirmados (tipo, indicador, roteiro, ocorrencias, fonte_curadoria, criado_em) VALUES (?, ?, ?, ?, ?, ?)",
-            item,
-        )
+        if dialect == "postgres":
+            cursor.execute(
+                """
+                INSERT INTO golpes_confirmados (tipo, indicador, roteiro, ocorrencias, fonte_curadoria, criado_em)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (indicador) DO NOTHING
+                """,
+                item,
+            )
+        else:
+            cursor.execute(
+                "INSERT OR IGNORE INTO golpes_confirmados (tipo, indicador, roteiro, ocorrencias, fonte_curadoria, criado_em) VALUES (?, ?, ?, ?, ?, ?)",
+                item,
+            )
     conn.commit()
     conn.close()
 
@@ -966,7 +1004,7 @@ init_db()
 
 
 def buscar_na_base_golpes(telefones: list, chaves_pix: list, links: list, codigo_boleto: str) -> list:
-    conn = sqlite3.connect(DB_PATH)
+    conn, dialect = _get_db_conn()
     cursor = conn.cursor()
     achados = []
     candidatos = []
@@ -984,9 +1022,10 @@ def buscar_na_base_golpes(telefones: list, chaves_pix: list, links: list, codigo
     if codigo_boleto:
         candidatos.append(re.sub(r"\D", "", str(codigo_boleto)))
 
+    placeholder = "%s" if dialect == "postgres" else "?"
     for cand in set(candidatos):
         cursor.execute(
-            "SELECT tipo, indicador, ocorrencias, fonte_curadoria FROM golpes_confirmados WHERE LOWER(indicador) LIKE ?",
+            f"SELECT tipo, indicador, ocorrencias, fonte_curadoria FROM golpes_confirmados WHERE LOWER(indicador) LIKE {placeholder}",
             (f"%{cand.lower()}%",),
         )
         for r in cursor.fetchall():
