@@ -1348,7 +1348,9 @@ async def pwa_icon_png():
 async def pwa_icon_svg():
     return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-cache"})
 
-
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return HTMLResponse(content=EMBEDDED_INDEX_HTML)
