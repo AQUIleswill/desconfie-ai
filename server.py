@@ -850,7 +850,18 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       }
 
       document.getElementById('verdictTitle').innerText = titulo;
-      document.getElementById('verdictReason').innerText = motivos.join(" ") || titulo;
+   const reasonPanel = document.getElementById('verdictReason');
+   const textoMotivos = motivos
+     .filter(m => m.toLowerCase() !== titulo.toLowerCase())
+     .join(" ")
+     .trim();
+
+   if (textoMotivos) {
+     reasonPanel.innerText = textoMotivos;
+     reasonPanel.style.display = 'block';
+   } else {
+     reasonPanel.style.display = 'none';
+   }
 
       const stepsPanel = document.getElementById('verdictStepsPanel');
       const stepsList = document.getElementById('verdictStepsList');
