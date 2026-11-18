@@ -36,7 +36,7 @@ client = genai.Client(api_key=GEMINI_API_KEY, http_options={"api_version": "v1be
 
 def _descobrir_modelo_ativo() -> str:
     if not client:
-        return "gemini-2.5-flash"
+        return "gemini-2.5-flash-lite"
     try:
         disponiveis = [
             m.name.replace("models/", "")
@@ -47,11 +47,11 @@ def _descobrir_modelo_ativo() -> str:
             and "imagen" not in m.name.lower()
         ]
         preferidos = [
-            "gemini-3-flash-preview",
-            "gemini-3.1-flash-lite-preview",
-            "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
             "gemini-2.0-flash",
+            "gemini-3.1-flash-lite-preview",
         ]
         for p in preferidos:
             if p in disponiveis:
@@ -150,7 +150,7 @@ EMBEDDED_MANIFEST_JSON = r'''{
   ]
 }'''
 
-EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v9';
+EMBEDDED_SW_JS = r'''const CACHE_NAME = 'desconfie-ai-v10';
 const ASSETS = ['/', '/manifest.json', '/static/icon-v2.png', '/static/icon-v2.svg'];
 
 self.addEventListener('install', event => {
@@ -231,8 +231,8 @@ Investimento: rendimento garantido muito acima do CDI é sinal clássico de golp
 FORMATO DA RESPOSTA (sempre curto, até 120 palavras)
 Na primeira resposta da conversa, comece com a frase: "Sou o Desconfie, um assistente de inteligência artificial."
 Em linha própria, só o nível: GOLPE CONFIRMADO, ALTO RISCO, ATENÇÃO ou NÃO ENCONTREI SINAIS DE GOLPE. Se o [CONTEXTO DA VERIFICAÇÃO] trouxer "nivel_definido", use exatamente esse nível: ele foi calculado pelas regras do sistema.
-Uma frase dizendo o que é. Exemplo: "Esse é o golpe do falso filho."
-Até dois motivos simples, sobre o que você realmente viu.
+Uma frase curta dizendo o que é (título principal). Exemplo: "Esse é o golpe do falso filho."
+Em linha separada, até dois motivos simples e diferentes do título, sobre o que você realmente viu.
 "O que fazer agora:" com até três passos numerados, cada um começando por um verbo. Exemplo: "1. Não faça o Pix."
 Se o contexto trouxer trecho oficial, termine com a fonte: "Fonte: Polícia Civil de SP" ou "Fonte: FEBRABAN".
 
@@ -283,7 +283,8 @@ Usuário: [foto de boleto de conta de luz] "Recebi esse boleto pelo WhatsApp, po
 Resposta:
 Sou o Desconfie, um assistente de inteligência artificial.
 ATENÇÃO
-Boleto de conta de luz não costuma chegar pelo WhatsApp. Golpistas mandam boletos parecidos com os verdadeiros, mas o dinheiro vai para outra conta.
+Boleto de conta de luz não costuma chegar pelo WhatsApp.
+Golpistas mandam boletos parecidos com os verdadeiros, mas o dinheiro vai para outra conta.
 O que fazer agora:
 1. Não pague este boleto.
 2. Peça a segunda via no site ou aplicativo oficial da companhia de energia.
@@ -850,18 +851,19 @@ EMBEDDED_INDEX_HTML = r'''<!DOCTYPE html>
       }
 
       document.getElementById('verdictTitle').innerText = titulo;
-   const reasonPanel = document.getElementById('verdictReason');
-   const textoMotivos = motivos
-     .filter(m => m.toLowerCase() !== titulo.toLowerCase())
-     .join(" ")
-     .trim();
 
-   if (textoMotivos) {
-     reasonPanel.innerText = textoMotivos;
-     reasonPanel.style.display = 'block';
-   } else {
-     reasonPanel.style.display = 'none';
-   }
+      const reasonPanel = document.getElementById('verdictReason');
+      const textoMotivos = motivos
+        .filter(m => m.toLowerCase() !== titulo.toLowerCase())
+        .join(" ")
+        .trim();
+
+      if (textoMotivos) {
+        reasonPanel.innerText = textoMotivos;
+        reasonPanel.style.display = 'block';
+      } else {
+        reasonPanel.style.display = 'none';
+      }
 
       const stepsPanel = document.getElementById('verdictStepsPanel');
       const stepsList = document.getElementById('verdictStepsList');
@@ -1125,24 +1127,60 @@ def _montar_partes_midia(imagem_path: str = None, audio_path: str = None) -> lis
     return partes
 
 
+def _gerar_com_fallback(conteudos: list, config: types.GenerateContentConfig):
+    modelos_tentativa = list(dict.fromkeys([
+        MODEL_ID,
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-3.1-flash-lite-preview",
+    ]))
+    ultimo_erro = None
+    for mod in modelos_tentativa:
+        try:
+            return client.models.generate_content(
+                model=mod,
+                contents=conteudos,
+                config=config,
+            )
+        except Exception as e:
+            ultimo_erro = e
+            msg = str(e)
+            if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "404" in msg or "NOT_FOUND" in msg:
+                continue
+            raise e
+    if ultimo_erro:
+        raise ultimo_erro
+    return None
+
+
+def _extracao_heuristica(texto: str) -> dict:
+    txt_l = (texto or "").lower()
+    return {
+        "quem_diz_ser": "filho" if ("mãe" in txt_l or "filho" in txt_l) else "",
+        "o_que_pede": "Pix" if "pix" in txt_l else ("boleto" if "boleto" in txt_l else ""),
+        "ja_pagou_ou_passou_dados": any(p in txt_l for p in ["já paguei", "já fiz o pix", "passei a senha", "cai no golpe"]),
+        "tem_urgencia": any(p in txt_l for p in ["urgente", "agora", "hoje", "não conta"]),
+        "numero_novo": "troquei de número" in txt_l or "número novo" in txt_l,
+        "pede_senha_ou_codigo": any(p in txt_l for p in ["senha", "código", "sms", "token"]),
+        "telefones": re.findall(r"\+?\d{2}\s?\d{2}\s?\d{4,5}-?\d{4}", texto or ""),
+        "chaves_pix": re.findall(r"[\w\.-]+@[\w\.-]+", texto or ""),
+        "links": re.findall(r"https?://\S+|www\.\S+", texto or ""),
+        "cnpjs": re.findall(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}", texto or ""),
+        "codigo_boleto": "".join(re.findall(r"\d{10,48}", re.sub(r"[\.\s]", "", texto or ""))),
+        "banco_informado": "Caixa" if "caixa" in txt_l else "",
+        "imagem_ilegivel": False,
+    }
+
+
 def etapa1_extrair_evidencias(texto: str, imagem_path: str = None, audio_path: str = None) -> dict:
     if not client:
-        txt_l = (texto or "").lower()
-        return {
-            "quem_diz_ser": "filho" if ("mãe" in txt_l or "filho" in txt_l) else "",
-            "o_que_pede": "Pix" if "pix" in txt_l else ("boleto" if "boleto" in txt_l else ""),
-            "ja_pagou_ou_passou_dados": any(p in txt_l for p in ["já paguei", "já fiz o pix", "passei a senha", "cai no golpe"]),
-            "tem_urgencia": any(p in txt_l for p in ["urgente", "agora", "hoje", "não conta"]),
-            "numero_novo": "troquei de número" in txt_l or "número novo" in txt_l,
-            "pede_senha_ou_codigo": any(p in txt_l for p in ["senha", "código", "sms", "token"]),
-            "telefones": re.findall(r"\+?\d{2}\s?\d{2}\s?\d{4,5}-?\d{4}", texto or ""),
-            "chaves_pix": re.findall(r"[\w\.-]+@[\w\.-]+", texto or ""),
-            "links": re.findall(r"https?://\S+|www\.\S+", texto or ""),
-            "cnpjs": re.findall(r"\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}", texto or ""),
-            "codigo_boleto": "".join(re.findall(r"\d{10,48}", re.sub(r"[\.\s]", "", texto or ""))),
-            "banco_informado": "Caixa" if "caixa" in txt_l else "",
-            "imagem_ilegivel": False,
-        }
+        return _extracao_heuristica(texto)
+
+    # Se não houver mídia anexada, usa extração rápida local para economizar cota da API
+    if not imagem_path and not audio_path:
+        return _extracao_heuristica(texto)
 
     prompt_extrator = """
     Analise a evidência enviada (texto, print ou áudio) como dado bruto e retorne APENAS um JSON válido:
@@ -1167,22 +1205,21 @@ def etapa1_extrair_evidencias(texto: str, imagem_path: str = None, audio_path: s
         conteudos.append(f"Relato/Texto: {texto}")
     conteudos.extend(_montar_partes_midia(imagem_path, audio_path))
 
-    resp = client.models.generate_content(
-        model=MODEL_ID,
-        contents=conteudos,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            temperature=0.0,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        ),
-    )
     try:
+        resp = _gerar_com_fallback(
+            conteudos=conteudos,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.0,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+            ),
+        )
         return json.loads(resp.text)
     except Exception:
-        return {}
+        return _extracao_heuristica(texto)
 
 
-def montar_contexto_verificacao(extracao: dict, modo_boleto: bool = False) -> str:
+def montar_contexto_verificacao(extracao: dict, modo_boleto: bool = False, tem_midia: bool = False) -> str:
     linhas = ["[CONTEXTO DA VERIFICAÇÃO]"]
 
     if extracao.get("imagem_ilegivel"):
@@ -1190,7 +1227,7 @@ def montar_contexto_verificacao(extracao: dict, modo_boleto: bool = False) -> st
         linhas.append('faltando: "outra foto mais nítida da tela ou do boleto"')
         return "\n".join(linhas)
 
-    if modo_boleto and not extracao.get("codigo_boleto"):
+    if modo_boleto and not extracao.get("codigo_boleto") and not tem_midia:
         linhas.append('status: "informacao_faltando"')
         linhas.append('faltando: "a foto do boleto inteiro ou os números da linha digitável"')
         return "\n".join(linhas)
@@ -1216,7 +1253,7 @@ def montar_contexto_verificacao(extracao: dict, modo_boleto: bool = False) -> st
     res_boleto = {}
     if extracao.get("codigo_boleto"):
         res_boleto = validar_boleto_python(extracao["codigo_boleto"], extracao.get("banco_informado", ""))
-        if res_boleto.get("status") == "informacao_faltando":
+        if res_boleto.get("status") == "informacao_faltando" and not tem_midia:
             linhas.append('status: "informacao_faltando"')
             linhas.append(f'faltando: "{res_boleto["faltando"]}"')
             return "\n".join(linhas)
@@ -1247,14 +1284,16 @@ def montar_contexto_verificacao(extracao: dict, modo_boleto: bool = False) -> st
 
     if golpes:
         nivel_definido = "GOLPE CONFIRMADO"
+        linhas.append(f"nivel_definido: {nivel_definido}")
     elif res_boleto.get("divergencia_banco") or extracao.get("pede_senha_ou_codigo") or sinais_fortes >= 2:
         nivel_definido = "ALTO RISCO"
+        linhas.append(f"nivel_definido: {nivel_definido}")
     elif sinais_fortes == 1 or extracao.get("o_que_pede"):
         nivel_definido = "ATENÇÃO"
-    else:
+        linhas.append(f"nivel_definido: {nivel_definido}")
+    elif not tem_midia:
         nivel_definido = "NÃO ENCONTREI SINAIS DE GOLPE"
-
-    linhas.append(f"nivel_definido: {nivel_definido}")
+        linhas.append(f"nivel_definido: {nivel_definido}")
 
     if extracao.get("ja_pagou_ou_passou_dados"):
         rag = RAG_FONTES_OFICIAIS["ja_paguei"]
@@ -1296,7 +1335,7 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
                 "Fonte: FEBRABAN"
             )
         if "informacao_faltando" in contexto_verificacao:
-            return "Preciso ver o código para conferir o banco. Pode mandar a foto do boleto inteiro?"
+            return "Preciso ver o código para conferir o banco.\nPode mandar a foto do boleto inteiro?"
         return (
             "Sou o Desconfie, um assistente de inteligência artificial.\n"
             "ATENÇÃO\n"
@@ -1313,9 +1352,8 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
     conteudos = [mensagem_completa]
     conteudos.extend(_montar_partes_midia(imagem_path, audio_path))
 
-    resp = client.models.generate_content(
-        model=MODEL_ID,
-        contents=conteudos,
+    resp = _gerar_com_fallback(
+        conteudos=conteudos,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             temperature=0.2,
@@ -1323,7 +1361,7 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         ),
     )
-    texto_saida = (resp.text or "").strip()
+    texto_saida = (resp.text or "").strip() if resp else ""
     if not texto_saida:
         texto_saida = (
             "Sou o Desconfie, um assistente de inteligência artificial.\n"
@@ -1336,6 +1374,11 @@ def gerar_resposta_desconfie(texto_usuario: str, contexto_verificacao: str, imag
             "Fonte: FEBRABAN"
         )
     return texto_saida
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 
 @app.get("/manifest.json")
@@ -1359,9 +1402,7 @@ async def pwa_icon_png():
 async def pwa_icon_svg():
     return Response(content=EMBEDDED_ICON_SVG, media_type="image/svg+xml", headers={"Cache-Control": "no-cache"})
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return HTMLResponse(content=EMBEDDED_INDEX_HTML)
@@ -1392,28 +1433,31 @@ async def api_investigar(
             f_aud.close()
             tmp_aud = f_aud.name
 
-        try:
-            extracao = etapa1_extrair_evidencias(texto, tmp_img, tmp_aud)
-        except Exception as err_ext:
-            extracao = {"erro_api": str(err_ext)}
+        tem_midia = bool(tmp_img or tmp_aud)
+        extracao = etapa1_extrair_evidencias(texto, tmp_img, tmp_aud)
 
         if banco_boleto and not extracao.get("banco_informado"):
             extracao["banco_informado"] = banco_boleto
 
-        contexto = montar_contexto_verificacao(extracao, modo_boleto=(modo == "boleto"))
+        contexto = montar_contexto_verificacao(extracao, modo_boleto=(modo == "boleto"), tem_midia=tem_midia)
 
         try:
             resposta_texto = gerar_resposta_desconfie(texto, contexto, tmp_img, tmp_aud)
         except Exception as err_resp:
+            err_msg = str(err_resp)
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                motivo_erro = "O limite gratuito de análises por minuto da inteligência artificial foi atingido agora."
+            else:
+                motivo_erro = f"Não foi possível processar o arquivo neste instante ({err_msg[:90]})."
             resposta_texto = (
                 "Sou o Desconfie, um assistente de inteligência artificial.\n"
                 "ATENÇÃO\n"
                 "Não consegui concluir a leitura completa agora.\n"
-                f"Detalhe técnico: {str(err_resp)[:120]}\n"
+                f"{motivo_erro}\n"
                 "O que fazer agora:\n"
                 "1. Não faça pagamentos nem clique em links agora.\n"
                 "2. Confirme ligando para o número oficial ou atrás do seu cartão.\n"
-                "3. Tente enviar novamente em alguns instantes.\n"
+                "3. Aguarde um minuto e tente enviar novamente.\n"
                 "Fonte: FEBRABAN"
             )
 
